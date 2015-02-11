@@ -48,7 +48,7 @@ def test_instance(crsfn, stufn):
         print 'Testing...', crsfn, 'and', stufn, "@", time.asctime()
 
     read_crs_file(crsfn)
-    read_crs_file(stufn)
+    read_stu_file(stufn)
         
     print ''
 
@@ -60,9 +60,19 @@ def read_crs_file(filename):
     if f == None:
         print "TT Error: read_crs_file could not open file:", filename 
     
-    print f[0]
+        
     
     else:
+        data = f.readline()
+        print data
+        data = data.split()
+        
+        room_cap = int(data[0])
+        timeslots = int(data[1])
+        
+        print 'Room cap:', room_cap
+        print 'Timeslots:', timeslots
+        
         for line in f:
             print line
             
@@ -82,6 +92,18 @@ def read_crs_file(filename):
             else:                                                   # clauses
                 temp_clauses.append(self.transform_clause(line.split()))
         """
+        
+def read_stu_file(filename):
+    f = open(filename, 'r')
+    if f == None:
+        print "TT Error: read_stu_file could not open file:", filename 
+    
+    else:
+        for line in f:
+            print line
+            
+        print ''
+
 
 
 if __name__ == "__main__":
