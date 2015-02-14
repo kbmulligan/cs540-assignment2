@@ -95,10 +95,21 @@ def show_items(items):
 def enroll_students(courses, students):
     for course in courses:
         course.enroll([student.stu_id for student in students if student.has_course(course.crs_id)])
+
         
+### UTILITY ###
 def get_course_with_timeslot(courses, slot):
     return [course.crs_id for course in courses if course.timeslot == slot]
 
+def get_day_and_timeslot_from_timeslot(timeslot):
+    exam_day = (timeslot // TIMESLOTS_PER_DAY) + 1
+    exam_timeslot = (timeslot % TIMESLOTS_PER_DAY)
+    if (exam_timeslot == 0):
+        exam_timeslot = TIMESLOTS_PER_DAY
+        exam_day -= 1
+    return exam_day, exam_timeslot
+    
+    
 def assign_random_timeslot(courses, maximum):
     for course in courses:
         assign_timeslot(course, random.randint(1,maximum))
@@ -205,12 +216,8 @@ def print_solution(sol):
     printable = printable + str(total_timeslots()) + '\t' + str(total_student_cost())
 
     for crs in sol:
-        exam_day = (crs.timeslot // TIMESLOTS_PER_DAY) + 1
-        exam_timeslot = (crs.timeslot % TIMESLOTS_PER_DAY)
-        if (exam_timeslot == 0):
-            exam_timeslot = TIMESLOTS_PER_DAY
-            exam_day -= 1
-        printable += '\n' + crs.crs_id + '\t' + str(exam_day) + '\t' + str(exam_timeslot) + '\t' + str(crs.timeslot)
+        exam_day, exam_timeslot = get_day_and_timeslot_from_timeslot(crs.timeslot)
+        printable += '\n' + crs.crs_id + '\t' + str(exam_day) + '\t' + str(exam_timeslot) #+ '\t' + str(crs.timeslot)
     
     return printable
         
