@@ -156,9 +156,19 @@ def exceeds_available_timeslots(courses, exam_week):
 def total_timeslots():
     return 7
     
-def total_student_cost():
+def total_student_cost(courses, students):
+    total_cost = 0
+    for stud in students:
+        total_cost += cap(courses, stud) + oap(courses, stud)
+    
     return 133.75
-
+    
+def cap(courses, stud):
+    return 0
+    
+def oap(courses, stud):
+    return 0
+    
 def read_crs_file(filename):
     """ Read course file and return list of courses, room capacity, and total timeslots."""
     courses = []
@@ -210,12 +220,12 @@ def read_stu_file(filename):
         
     return students
 
-def print_solution(sol):
+def print_solution(courses, students):
     printable = ''
     
-    printable = printable + str(total_timeslots()) + '\t' + str(total_student_cost())
+    printable = printable + str(total_timeslots()) + '\t' + str(total_student_cost(courses, students))
 
-    for crs in sol:
+    for crs in courses:
         exam_day, exam_timeslot = get_day_and_timeslot_from_timeslot(crs.timeslot)
         printable += '\n' + crs.crs_id + '\t' + str(exam_day) + '\t' + str(exam_timeslot) #+ '\t' + str(crs.timeslot)
     
@@ -243,7 +253,7 @@ def test_instance(crsfn, stufn):
     check_constraints(courses, exam_week)
     
     print exam_week.display(courses)
-    print print_solution(courses)
+    print print_solution(courses, students)
         
     print ''
 
