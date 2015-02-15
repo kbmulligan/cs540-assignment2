@@ -200,9 +200,10 @@ def get_all_overnight_course_combos(courses, stud):
 def get_all_course_combos(courses, stud):
     combos = []
     
+    # loop through all course combos and determine if they belong to the student, use set() to avoid adding duplicates
     for course1 in courses:
         for course2 in courses:
-            if (course1.crs_id != course2.crs_id) and stud.has_course(course1) and stud.has_course(course2):
+            if (course1.crs_id != course2.crs_id) and stud.has_course(course1) and stud.has_course(course2) and (set(course1, course2) not in combos):
                 combos.append(set(course1, course2))
                 
     return combos
