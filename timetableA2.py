@@ -26,7 +26,7 @@ EOL = '\n'
 
 
 subdir = './'
-crsfile = "instance1.crs"                   # CHANGE BEFORE TURN-IN
+crsfile = "instance1.crs"
 stufile = "instance1.stu"
 solfile = "instance1.sol"
 
@@ -153,21 +153,49 @@ def exceeds_available_timeslots(courses, exam_week):
     return False
     
 ### SOFT CONSTRAINTS ###
-def total_timeslots():
-    return 7
+def total_timeslots(courses):
+    timeslots = []
+    for course in courses:
+        timeslots.append(course.timeslot)
+    return len(set(timeslots))
     
 def total_student_cost(courses, students):
     total_cost = 0
     for stud in students:
         total_cost += cap(courses, stud) + oap(courses, stud)
-    
     return 133.75
-    
+    return total_cost
+
+# PENALTY FOR SAME DAY EXAMS (CONSECUTIVE)
 def cap(courses, stud):
-    return 0
+    combos = get_all_sameday_course_combos(courses, stud)     # filter for applicable combinations
     
-def oap(courses, stud):
+    penalty = 0
+    for combo in combos:                                    # loop through applicable combinations
+        t1 = combo[0].timeslot
+        t2 = combo[1].timeslot
+        penalty += 2**(-abs(t1, t2))
+    
     return 0
+    return penalty
+    
+# PENALTY FOR SEPARATE DAY EXAMS (OVERNIGHT)
+def oap(courses, stud):
+    #penalty = 2**()
+    return 0
+
+# Return combinations for given student
+def get_all_sameday_course_combos(courses, stud):
+    combos = get_all_course_combos(courses, stud)
+    return combos
+    
+def get_all_overnight_course_combos(courses, stud):
+    combos = get_all_course_combos(courses, stud)
+    return combos    
+    
+def get_all_course_combos(courses, stud):
+    combos = []
+    return combos
     
 def read_crs_file(filename):
     """ Read course file and return list of courses, room capacity, and total timeslots."""
@@ -223,7 +251,7 @@ def read_stu_file(filename):
 def print_solution(courses, students):
     printable = ''
     
-    printable = printable + str(total_timeslots()) + '\t' + str(total_student_cost(courses, students))
+    printable = printable + str(total_timeslots(courses)) + '\t' + str(total_student_cost(courses, students))
 
     for crs in courses:
         exam_day, exam_timeslot = get_day_and_timeslot_from_timeslot(crs.timeslot)
