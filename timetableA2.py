@@ -53,12 +53,12 @@ class Student:
     def __init__(self, name):
         self.stu_id = name
         self.courses = []
-        
-    def add_course(self, crs):
-        self.courses.append(crs)
     
-    def has_course(self, crs):
-        has = crs in self.courses
+    def add_course(self, crs_id):
+        self.courses.append(crs_id)
+    
+    def has_course(self, crs_id):
+        has = crs_id in self.courses
         """
         if has:
             print self.stu_id, 'has', crs
@@ -175,14 +175,18 @@ def cap(courses, stud):
         t1 = combo[0].timeslot
         t2 = combo[1].timeslot
         penalty += 2**(-abs(t1, t2))
-    
-    return 0
     return penalty
     
 # PENALTY FOR SEPARATE DAY EXAMS (OVERNIGHT)
 def oap(courses, stud):
-    #penalty = 2**()
-    return 0
+    combos = get_all_overnight_course_combos(courses, stud)     # filter for applicable combinations
+    
+    penalty = 0
+    for combo in combos:                                    # loop through applicable combinations
+        t1 = combo[0].timeslot
+        t2 = combo[1].timeslot
+        penalty += 2**(-abs(t1, t2))
+    return penalty
 
 # Return combinations for given student
 def get_all_sameday_course_combos(courses, stud):
@@ -195,10 +199,16 @@ def get_all_overnight_course_combos(courses, stud):
     
 def get_all_course_combos(courses, stud):
     combos = []
+    
+    for course1 in courses:
+        for course2 in courses:
+            if (course1.crs_id != course2.crs_id) and stud.has_course(course1) and stud.has_course(course2):
+                combos.append(set(course1, course2))
+                
     return combos
     
 def read_crs_file(filename):
-    """ Read course file and return list of courses, room capacity, and total timeslots."""
+    """Read course file and return list of courses, room capacity, and total timeslots."""
     courses = []
     
     f = open(filename, 'r')
