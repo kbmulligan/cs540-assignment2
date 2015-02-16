@@ -32,6 +32,8 @@ solfile = "instance1.sol"
 
 TIMESLOTS_PER_DAY = 5
 
+CAP_MULTIPLIER = 10
+
 
 class ExamWeek:
 
@@ -185,7 +187,7 @@ def total_timeslots(courses):
 def total_student_cost(courses, students):
     total_cost = 0
     for stud in students:
-        total_cost += cap(courses, stud) + oap(courses, stud)
+        total_cost += CAP_MULTIPLIER*cap(courses, stud) + oap(courses, stud)
     #return 133.75
     return total_cost
 
@@ -196,8 +198,8 @@ def cap(courses, stud):
     penalty = 0
     for combo in combos:                                    # loop through applicable combinations
         pair = list(combo)
-        t1 = pair[0].timeslot
-        t2 = pair[1].timeslot
+        t1 = get_day_and_timeslot_from_timeslot(pair[0].timeslot)[1]    # extract day's timeslot
+        t2 = get_day_and_timeslot_from_timeslot(pair[1].timeslot)[1]    
         penalty += 2**(-abs(t1 - t2))
     return penalty
     
@@ -208,9 +210,9 @@ def oap(courses, stud):
     penalty = 0
     for combo in combos:                                    # loop through applicable combinations
         pair = list(combo)
-        t1 = pair[0].timeslot
-        t2 = pair[1].timeslot
-        penalty += 2**(-abs(t1 - t2))
+        d1 = get_day_and_timeslot_from_timeslot(pair[0].timeslot)[0]    # extract day
+        d2 = get_day_and_timeslot_from_timeslot(pair[1].timeslot)[0]
+        penalty += 2**(-abs(d1 - d2))
     return penalty
 
 # Return combinations for given student
@@ -258,7 +260,8 @@ def read_crs_file(filename):
         
         for line in f:
             print line.strip()
-            courses.append(Course(line.split('\t')[0], line.split('\t')[1]))
+            split_data = line.split()
+            courses.append(Course(split_data[0], split_data[1]))
             
         print ''
         
@@ -373,8 +376,7 @@ if __name__ == "__main__":
         solfile = sys.argv[3]
         obj_function = sys.argv[4]
         test_instance(crsfile, stufile, solfile, obj_function)
-        
-        
+
 
     print "Testing complete!"
 
