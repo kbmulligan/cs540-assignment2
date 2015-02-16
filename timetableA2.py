@@ -77,7 +77,7 @@ class Course:
     def __init__(self, name, enrollment):
         self.crs_id = name
         self.students = ()
-        self.enrolled = enrollment
+        self.enrolled = int(enrollment)
         self.timeslot = 0
         
     def display(self):
@@ -124,7 +124,7 @@ def check_constraints(courses, exam_week):
     satisfied = True
     satisfied = satisfied and not has_exam_gaps(courses)
     satisfied = satisfied and not has_student_conflict(courses)
-    satisfied = satisfied and not exceeds_room_cap(courses)
+    satisfied = satisfied and not exceeds_room_cap(courses, exam_week)
     satisfied = satisfied and not exceeds_available_timeslots(courses, exam_week)
     return satisfied
 
@@ -139,9 +139,16 @@ def has_student_conflict(courses):
         pass
     return False
     
-def exceeds_room_cap(courses):
+def exceeds_room_cap(courses, exam_week):
+    occupancy = {}
+    for x in range(1, exam_week.timeslots + 1):
+        occupancy[x] = 0
     for course in courses:
-        pass
+        occupancy[course.timeslot] += course.enrolled
+    for x in range(1, exam_week.timeslots + 1):
+        if (occupancy[x] > exam_week.room_cap):
+            print 'CONFLICT: Exam timetable exceeds room capacity. Timeslot:', x 
+            return True
     return False
     
 def exceeds_available_timeslots(courses, exam_week):
