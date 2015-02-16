@@ -175,6 +175,21 @@ def perturb_timetable(timetable, exam_week):
     timetable[crs] += delta
     timetable[crs] = ensure_valid(timetable[crs], exam_week)
     return timetable
+    
+def neighboring_timetables(timetable, exam_week):
+    """ Returns list of all timetables 1 step from given timetable. """
+    neighbors = []
+    delta = 1
+    for crs in range(len(timetable)):
+        new_timetable_up = list(timetable)
+        new_timetable_down = list(timetable)
+        new_timetable_up[crs] += delta
+        new_timetable_down[crs] -= delta
+        new_timetable_up[crs] = ensure_valid(new_timetable_up[crs], exam_week)
+        new_timetable_down[crs] = ensure_valid(new_timetable_down[crs], exam_week)
+        neighbors.append(new_timetable_up)
+        neighbors.append(new_timetable_down)
+    return neighbors
 
 def ensure_valid(slot, exam_week):
     slot = min(exam_week.timeslots, slot)
@@ -246,10 +261,10 @@ def total_student_cost(courses, students):
 
 # PENALTY FOR SAME DAY EXAMS (CONSECUTIVE)
 def cap(courses, stud):
-    combos = get_all_sameday_course_combos(courses, stud)     # filter for applicable combinations
+    combos = get_all_sameday_course_combos(courses, stud)               # filter for applicable combinations
     
     penalty = 0
-    for combo in combos:                                    # loop through applicable combinations
+    for combo in combos:                                                # loop through applicable combinations
         pair = list(combo)
         t1 = get_day_and_timeslot_from_timeslot(pair[0].timeslot)[1]    # extract day's timeslot
         t2 = get_day_and_timeslot_from_timeslot(pair[1].timeslot)[1]    
@@ -258,10 +273,10 @@ def cap(courses, stud):
     
 # PENALTY FOR SEPARATE DAY EXAMS (OVERNIGHT)
 def oap(courses, stud):
-    combos = get_all_overnight_course_combos(courses, stud)     # filter for applicable combinations
+    combos = get_all_overnight_course_combos(courses, stud)             # filter for applicable combinations
     
     penalty = 0
-    for combo in combos:                                    # loop through applicable combinations
+    for combo in combos:                                                # loop through applicable combinations
         pair = list(combo)
         d1 = get_day_and_timeslot_from_timeslot(pair[0].timeslot)[0]    # extract day
         d2 = get_day_and_timeslot_from_timeslot(pair[1].timeslot)[0]
@@ -280,6 +295,7 @@ def get_all_overnight_course_combos(courses, stud):
     return filtered    
     
 def get_all_course_combos(courses, stud):
+    """ Return all pairs of courses that a given student is taking. """
     combos = []
     
     # loop through all course combos and determine if they belong to the student, use set() to avoid adding duplicates
@@ -427,6 +443,8 @@ def test_instance(crsfn, stufn, solfn, obj):
     print '--- SOLUTION ---'
     print sol
     write_solution_file(solfn, sol)
+    
+    # print '\nNeighbors:', len(neighboring_timetables(timetable, exam_week))
     
     # print ''
     # test_combination_code(courses, students)
