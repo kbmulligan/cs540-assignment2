@@ -88,6 +88,8 @@ class Course:
     def enroll(self, new_students):
         self.students = new_students
 
+
+### UTILITY ###
 def show_items(items):
     for item in items:
         print item.display()
@@ -95,9 +97,7 @@ def show_items(items):
 def enroll_students(courses, students):
     for course in courses:
         course.enroll([student.stu_id for student in students if student.has_course(course.crs_id)])
-
         
-### UTILITY ###
 def get_course_with_timeslot(courses, slot):
     return [course.crs_id for course in courses if course.timeslot == slot]
 
@@ -108,7 +108,6 @@ def get_day_and_timeslot_from_timeslot(timeslot):
         exam_timeslot = TIMESLOTS_PER_DAY
         exam_day -= 1
     return exam_day, exam_timeslot
-    
     
 def assign_random_timeslot(courses, maximum):
     for course in courses:
@@ -163,7 +162,7 @@ def total_student_cost(courses, students):
     total_cost = 0
     for stud in students:
         total_cost += cap(courses, stud) + oap(courses, stud)
-    return 133.75
+    #return 133.75
     return total_cost
 
 # PENALTY FOR SAME DAY EXAMS (CONSECUTIVE)
@@ -172,9 +171,10 @@ def cap(courses, stud):
     
     penalty = 0
     for combo in combos:                                    # loop through applicable combinations
-        t1 = combo[0].timeslot
-        t2 = combo[1].timeslot
-        penalty += 2**(-abs(t1, t2))
+        pair = list(combo)
+        t1 = pair[0].timeslot
+        t2 = pair[1].timeslot
+        penalty += 2**(-abs(t1 - t2))
     return penalty
     
 # PENALTY FOR SEPARATE DAY EXAMS (OVERNIGHT)
@@ -183,9 +183,10 @@ def oap(courses, stud):
     
     penalty = 0
     for combo in combos:                                    # loop through applicable combinations
-        t1 = combo[0].timeslot
-        t2 = combo[1].timeslot
-        penalty += 2**(-abs(t1, t2))
+        pair = list(combo)
+        t1 = pair[0].timeslot
+        t2 = pair[1].timeslot
+        penalty += 2**(-abs(t1 - t2))
     return penalty
 
 # Return combinations for given student
@@ -203,8 +204,9 @@ def get_all_course_combos(courses, stud):
     # loop through all course combos and determine if they belong to the student, use set() to avoid adding duplicates
     for course1 in courses:
         for course2 in courses:
-            if (course1.crs_id != course2.crs_id) and stud.has_course(course1) and stud.has_course(course2) and (set(course1, course2) not in combos):
-                combos.append(set(course1, course2))
+            #print course1.crs_id, course2.crs_id
+            if (course1.crs_id != course2.crs_id) and stud.has_course(course1.crs_id) and stud.has_course(course2.crs_id) and (set([course1, course2]) not in combos):
+                combos.append(set([course1, course2]))
                 
     return combos
     
@@ -269,6 +271,16 @@ def print_solution(courses, students):
         printable += '\n' + crs.crs_id + '\t' + str(exam_day) + '\t' + str(exam_timeslot) #+ '\t' + str(crs.timeslot)
     
     return printable
+    
+def test_combination_code(courses, students):
+    print 'Testing combination code...'
+    for stud in students:
+        pairs = ''
+        for combo in get_all_course_combos(courses, stud):
+            pair = list(combo)
+            pairs += str((pair[0].crs_id, pair[1].crs_id))
+        print stud.stu_id, pairs
+        
         
 def test_instance(crsfn, stufn):
     
@@ -293,7 +305,11 @@ def test_instance(crsfn, stufn):
     
     print exam_week.display(courses)
     print print_solution(courses, students)
-        
+    
+    print ''
+    
+    test_combination_code(courses, students)
+
     print ''
 
     return
@@ -308,6 +324,8 @@ if __name__ == "__main__":
         solfile = sys.argv[3]
         obj_function = sys.argv[4]
         test_instance(crsfile, stufile)
+        
+        
 
     print "Testing complete!"
 
