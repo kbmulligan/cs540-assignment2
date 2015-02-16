@@ -16,6 +16,9 @@ import copy
 
 ARGS = 5
 
+MINIMIZE_TIMESLOTS = 0
+MINIMIZE_STUDENTCOST = 1
+
 VERBOSE_LOADING = False
 VERBOSE_TESTING = True
 
@@ -116,6 +119,10 @@ def get_day_and_timeslot_from_timeslot(timeslot):
         exam_timeslot = TIMESLOTS_PER_DAY
         exam_day -= 1
     return exam_day, exam_timeslot
+
+### TIMESLOT ASSIGNMENT ###  
+def assign_timeslot(course, slot):
+    course.timeslot = slot
     
 def assign_random_timeslot(courses, maximum):
     for course in courses:
@@ -124,10 +131,39 @@ def assign_random_timeslot(courses, maximum):
 def assign_blanket_timeslot(courses, slot):
     for course in courses:
         assign_timeslot(course, slot)
-        
-def assign_timeslot(course, slot):
-    course.timeslot = slot
+
+def assign_timeslots(courses, timeslots):
+    """ Assign timeslots to all courses given lists of timeslots and courses of equal length. """
+    if len(courses) != len(timeslots):
+        print 'ERROR: assign_timeslots given list inputs of differing lengths.'
+    else:
+        for x in range(len(courses)):
+            assign_timeslot(courses[x], timeslots[x])
     
+def assign_canned_timeslots(courses):
+    """ Assign timeslots to all courses of instance1 based on given example. """
+    for course in courses:
+        if course.crs_id in ('001', '004', '006'):
+            course.timeslot = 1
+        elif course.crs_id == '002':
+            course.timeslot = 2
+        elif course.crs_id == '003':
+            course.timeslot = 3
+        elif course.crs_id in ('005', '007'):
+            course.timeslot = 4
+        elif course.crs_id == '008':
+            course.timeslot = 5
+        elif course.crs_id == '009':
+            course.timeslot = 6
+        elif course.crs_id == '010':
+            course.timeslot = 7
+        else:
+            course.timeslot = 99
+
+### TIMETABLE GENERATION ###
+
+
+### CONSTRAINTS ###
 def check_constraints(courses, students, exam_week):
     satisfied = True
     satisfied = satisfied and not has_exam_gaps(courses)
@@ -153,7 +189,7 @@ def has_student_conflict(courses, students, exam_week):                 # loop t
 
         timeslots = [course.timeslot for course in student_courses]
         if len(timeslots) != len(set(timeslots)):
-            print 'CONFLICT: Exam timetable contains STUDENT CONFLICT. Timeslots:', timeslots
+            print 'CONFLICT: Exam timetable contains STUDENT CONFLICT. \n  Student:', stud.stu_id, '\n  Timeslots:', timeslots, '\n'
             return True
 
     return False
@@ -237,31 +273,7 @@ def get_all_course_combos(courses, stud):
                 combos.append([course1, course2])
                 
     return combos
-    
-    
-def assign_canned_timeslots(courses):
-    """ Assign timeslots to all courses. """
-    for course in courses:
-        if course.crs_id in ('001', '004', '006'):
-            course.timeslot = 1
-        elif course.crs_id == '002':
-            course.timeslot = 2
-        elif course.crs_id == '003':
-            course.timeslot = 3
-        elif course.crs_id in ('005', '007'):
-            course.timeslot = 4
-        elif course.crs_id == '008':
-            course.timeslot = 5
-        elif course.crs_id == '009':
-            course.timeslot = 6
-        elif course.crs_id == '010':
-            course.timeslot = 7
-            
-            
-        else:
-            course.timeslot = 99
-         
-    
+
     
 def read_crs_file(filename):
     """Read course file and return list of courses, room capacity, and total timeslots."""
@@ -379,7 +391,10 @@ def test_instance(crsfn, stufn, solfn, obj):
         assign_random_timeslot(courses, num_exams)
     """
     
-    assign_canned_timeslots(courses)
+    # assign_canned_timeslots(courses)
+    
+    assign_timeslots(courses, [x/2+1 for x in range(len(courses))])
+    
     check_constraints(courses, students, exam_week)
     
     print exam_week.display(courses)
