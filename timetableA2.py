@@ -289,14 +289,27 @@ def read_stu_file(filename):
 
 def print_solution(courses, students):
     printable = ''
-    
-    printable = printable + str(total_timeslots(courses)) + '\t' + str(total_student_cost(courses, students))
+    str_slots = str(total_timeslots(courses))
+    str_cost = "{0:.2f}".format(total_student_cost(courses, students))
+    printable = printable + str_slots + '\t' + str_cost
 
     for crs in courses:
         exam_day, exam_timeslot = get_day_and_timeslot_from_timeslot(crs.timeslot)
         printable += '\n' + crs.crs_id + '\t' + str(exam_day) + '\t' + str(exam_timeslot) #+ '\t' + str(crs.timeslot)
     
     return printable
+    
+def write_solution_file(filename, sol):
+    """Write solution to file."""
+
+    f = open(filename, 'w')
+    if f == None:
+        print "TT Error: write_solution_file could not open file:", filename 
+    
+    else:
+        for line in sol:
+            f.write(line)
+    return
     
 def test_combination_code(courses, students):
     print 'Testing combination code...'
@@ -314,7 +327,7 @@ def test_combination_code(courses, students):
         print stud.stu_id, pairs, overnights, samedays
         
         
-def test_instance(crsfn, stufn):
+def test_instance(crsfn, stufn, solfn, obj):
     
     if VERBOSE_TESTING:
         print 'Testing...', crsfn, 'and', stufn, "@", time.asctime()
@@ -337,7 +350,10 @@ def test_instance(crsfn, stufn):
         assign_random_timeslot(courses, num_exams)
     
     print exam_week.display(courses)
-    print print_solution(courses, students)
+    sol = print_solution(courses, students)
+    
+    print sol
+    write_solution_file(solfn, sol)
     
     print ''
     
@@ -356,7 +372,7 @@ if __name__ == "__main__":
         stufile = sys.argv[2]
         solfile = sys.argv[3]
         obj_function = sys.argv[4]
-        test_instance(crsfile, stufile)
+        test_instance(crsfile, stufile, solfile, obj_function)
         
         
 
