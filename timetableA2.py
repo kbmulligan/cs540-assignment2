@@ -130,8 +130,13 @@ def check_constraints(courses, exam_week):
 
 ### HARD CONSTRAINTS ###    
 def has_exam_gaps(courses):
+    timeslots = []
     for course in courses:
-        pass
+        timeslots.append(course.timeslot)
+    for x in range(1, max(timeslots)):
+        if x not in timeslots:
+            print 'CONFLICT: Exam timetable contains EXAM GAP. Timeslot:', x
+            return True
     return False
     
 def has_student_conflict(courses):
@@ -323,7 +328,7 @@ def test_instance(crsfn, stufn):
     
     print ''
     
-    test_combination_code(courses, students)
+    # test_combination_code(courses, students)
 
     print ''
 
