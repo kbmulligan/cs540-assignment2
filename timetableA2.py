@@ -21,6 +21,7 @@ MINIMIZE_STUDENTCOST = 1
 
 VERBOSE_LOADING = False
 VERBOSE_TESTING = True
+VERBOSE_ALERTS = False
 
 
 DEC_PRECISION = 5
@@ -45,7 +46,7 @@ class ExamWeek:
         self.timeslots = num_exams
         
     def display(self, courses):
-        data = '--- Exam Week ---\n' + 'Room capacity: ' + str(self.room_cap) + '\nTotal Exams: ' + str(self.timeslots) + '\n'
+        data = '--- Exam Week ---\n' + 'Room capacity:       ' + str(self.room_cap) + '\nAvailable timeslots: ' + str(self.timeslots) + '\n'
         
         for x in range(1, self.timeslots + 1):
             data += '\n' + str(x) + ': '
@@ -161,7 +162,24 @@ def assign_canned_timeslots(courses):
             course.timeslot = 99
 
 ### TIMETABLE GENERATION ###
+def generate_timetable(courses, exam_week):
+    """ Generates initial timetable randomly. """
+    maximum = exam_week.timeslots
+    return [random.randint(1, maximum) for course in courses]
+    
+def perturb_timetable(timetable, exam_week):
+    """ Selects random course(crs) from timetable and moves it STEPS timeslots in the timetable. """
+    STEPS = 1
+    delta = random.choice([-STEPS, STEPS])
+    crs = random.randint(0, len(timetable) - 1)
+    timetable[crs] += delta
+    timetable[crs] = ensure_valid(timetable[crs], exam_week)
+    return timetable
 
+def ensure_valid(slot, exam_week):
+    slot = min(exam_week.timeslots, slot)
+    slot = max(1, slot)
+    return slot
 
 ### CONSTRAINTS ###
 def check_constraints(courses, students, exam_week):
@@ -179,7 +197,7 @@ def has_exam_gaps(courses):
         timeslots.append(course.timeslot)
     for x in range(1, max(timeslots)):
         if x not in timeslots:
-            print 'CONFLICT: Exam timetable contains EXAM GAP. Timeslot:', x
+            if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable contains EXAM GAP. Timeslot:', x
             return True
     return False
     
@@ -189,7 +207,7 @@ def has_student_conflict(courses, students, exam_week):                 # loop t
 
         timeslots = [course.timeslot for course in student_courses]
         if len(timeslots) != len(set(timeslots)):
-            print 'CONFLICT: Exam timetable contains STUDENT CONFLICT. \n  Student:', stud.stu_id, '\n  Timeslots:', timeslots, '\n'
+            if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable contains STUDENT CONFLICT. \n  Student:', stud.stu_id, '\n  Timeslots:', timeslots, '\n'
             return True
 
     return False
@@ -202,19 +220,19 @@ def exceeds_room_cap(courses, exam_week):
         occupancy[course.timeslot] += course.enrolled
     for x in range(1, exam_week.timeslots + 1):
         if (occupancy[x] > exam_week.room_cap):
-            print 'CONFLICT: Exam timetable exceeds room capacity. Timeslot:', x 
+            if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable exceeds room capacity. Timeslot:', x 
             return True
     return False
     
 def exceeds_available_timeslots(courses, exam_week):
     for course in courses:
         if course.timeslot > exam_week.timeslots:
-            print 'CONFLICT: Exam timetable exceeds available timeslots.'
+            if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable exceeds available timeslots.'
             return True
     return False
     
 ### SOFT CONSTRAINTS ###
-def total_timeslots(courses):
+def total_timeslots(courses, students):
     timeslots = []
     for course in courses:
         timeslots.append(course.timeslot)
@@ -224,7 +242,6 @@ def total_student_cost(courses, students):
     total_cost = 0
     for stud in students:
         total_cost += CAP_MULTIPLIER*cap(courses, stud) + oap(courses, stud)
-    #return 133.75
     return total_cost
 
 # PENALTY FOR SAME DAY EXAMS (CONSECUTIVE)
@@ -284,23 +301,23 @@ def read_crs_file(filename):
         print "TT Error: read_crs_file could not open file:", filename 
     else:
         data = f.readline()
-        print data
+        if VERBOSE_LOADING: print data
         data = data.split()
         
         room_cap = int(data[0])
         timeslots = int(data[1])
         
-        print 'Room Capacity:', room_cap
-        print 'Timeslots:', timeslots
+        if VERBOSE_LOADING: print 'Room Capacity:', room_cap
+        if VERBOSE_LOADING: print 'Timeslots:', timeslots
         
-        print ''
+        if VERBOSE_LOADING: print ''
         
         for line in f:
-            print line.strip()
+            if VERBOSE_LOADING: print line.strip()
             split_data = line.split()
             courses.append(Course(split_data[0], split_data[1]))
             
-        print ''
+        if VERBOSE_LOADING: print ''
         
     return courses, room_cap, timeslots
     
@@ -315,7 +332,7 @@ def read_stu_file(filename):
     else:
         stud_count = 1
         for line in f:
-            print line.strip()
+            if VERBOSE_LOADING: print line.strip()
             new_student = Student(stud_count)
             courses = line.split()
             for course in courses:
@@ -323,13 +340,13 @@ def read_stu_file(filename):
             students.append(new_student)
             stud_count += 1
             
-        print ''
+        if VERBOSE_LOADING: print ''
         
     return students
 
 def print_solution(courses, students):
     printable = ''
-    str_slots = str(total_timeslots(courses))
+    str_slots = str(total_timeslots(courses, students))
     str_cost = "{0:.2f}".format(total_student_cost(courses, students))
     printable = printable + str_slots + '\t' + str_cost
 
@@ -383,23 +400,31 @@ def test_instance(crsfn, stufn, solfn, obj):
     
     exam_week = ExamWeek(room_cap, num_exams)
     
-    """
-    assign_random_timeslot(courses, num_exams)
+    ### SETUP COMPLETE - BEGIN SLS ###
     
+    timetable = generate_timetable(courses, exam_week)
+    assign_timeslots(courses, timetable)
+    
+    if (obj == MINIMIZE_STUDENTCOST):
+        measure = total_student_cost
+        goal = 45
+        print 'SOFT CONSTRAINT: Minimizing student cost.\n'
+    else:
+        measure = total_timeslots
+        goal = 7
+        print 'SOFT CONSTRAINT: Minimizing timeslots used.\n'
+
     # Check constraints and loop until satisfied
-    while (check_constraints(courses, students, exam_week) == False):
-        assign_random_timeslot(courses, num_exams)
-    """
+    while ((check_constraints(courses, students, exam_week) == False) or (measure(courses, students) > goal)):
+        assign_timeslots(courses, perturb_timetable(timetable, exam_week))
     
-    # assign_canned_timeslots(courses)
-    
-    assign_timeslots(courses, [x/2+1 for x in range(len(courses))])
-    
-    check_constraints(courses, students, exam_week)
+
+    ### TERMINATE ###
     
     print exam_week.display(courses)
     sol = print_solution(courses, students)
     
+    print '--- SOLUTION ---'
     print sol
     write_solution_file(solfn, sol)
     
@@ -418,7 +443,7 @@ if __name__ == "__main__":
         crsfile = sys.argv[1]
         stufile = sys.argv[2]
         solfile = sys.argv[3]
-        obj_function = sys.argv[4]
+        obj_function = int(sys.argv[4])
         test_instance(crsfile, stufile, solfile, obj_function)
 
 
