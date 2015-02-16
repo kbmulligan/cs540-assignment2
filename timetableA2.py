@@ -44,7 +44,7 @@ class ExamWeek:
         
         for x in range(1, self.timeslots + 1):
             data += '\n' + str(x) + ': '
-            data += str(get_course_with_timeslot(courses, x))
+            data += str(get_courses_with_timeslot(courses, x))
         data += '\n'
         return data
 
@@ -98,8 +98,14 @@ def enroll_students(courses, students):
     for course in courses:
         course.enroll([student.stu_id for student in students if student.has_course(course.crs_id)])
         
-def get_course_with_timeslot(courses, slot):
+def get_courses_with_timeslot(courses, slot):
     return [course.crs_id for course in courses if course.timeslot == slot]
+    
+def get_course_by_id(course_id, courses):
+    for course in courses:
+        if course.crs_id == course_id:
+            return course
+    return None
 
 def get_day_and_timeslot_from_timeslot(timeslot):
     exam_day = (timeslot // TIMESLOTS_PER_DAY) + 1
@@ -120,10 +126,10 @@ def assign_blanket_timeslot(courses, slot):
 def assign_timeslot(course, slot):
     course.timeslot = slot
     
-def check_constraints(courses, exam_week):
+def check_constraints(courses, students, exam_week):
     satisfied = True
     satisfied = satisfied and not has_exam_gaps(courses)
-    satisfied = satisfied and not has_student_conflict(courses)
+    satisfied = satisfied and not has_student_conflict(courses, students, exam_week)
     satisfied = satisfied and not exceeds_room_cap(courses, exam_week)
     satisfied = satisfied and not exceeds_available_timeslots(courses, exam_week)
     return satisfied
@@ -139,9 +145,15 @@ def has_exam_gaps(courses):
             return True
     return False
     
-def has_student_conflict(courses):
-    for course in courses:
-        pass
+def has_student_conflict(courses, students, exam_week):                 # loop through students and make sure each students courses have different timeslots
+    for stud in students:
+        student_courses = [get_course_by_id(course, courses) for course in stud.courses]
+
+        timeslots = [course.timeslot for course in student_courses]
+        if len(timeslots) != len(set(timeslots)):
+            print 'CONFLICT: Exam timetable contains STUDENT CONFLICT. Timeslots:', timeslots
+            return True
+
     return False
     
 def exceeds_room_cap(courses, exam_week):
@@ -321,7 +333,8 @@ def test_instance(crsfn, stufn):
     assign_random_timeslot(courses, num_exams)
     
     ### Check constraints
-    check_constraints(courses, exam_week)
+    while (check_constraints(courses, students, exam_week) == False):
+        assign_random_timeslot(courses, num_exams)
     
     print exam_week.display(courses)
     print print_solution(courses, students)
