@@ -198,12 +198,14 @@ def oap(courses, stud):
 
 # Return combinations for given student
 def get_all_sameday_course_combos(courses, stud):
-    combos = get_all_course_combos(courses, stud)
-    return combos
+    combos = [list(combo) for combo in get_all_course_combos(courses, stud)]
+    filtered = [combo for combo in combos if get_day_and_timeslot_from_timeslot(combo[0].timeslot)[0] == get_day_and_timeslot_from_timeslot(combo[1].timeslot)[0]]
+    return filtered
     
 def get_all_overnight_course_combos(courses, stud):
-    combos = get_all_course_combos(courses, stud)
-    return combos    
+    combos = [list(combo) for combo in get_all_course_combos(courses, stud)]
+    filtered = [combo for combo in combos if get_day_and_timeslot_from_timeslot(combo[0].timeslot)[0] != get_day_and_timeslot_from_timeslot(combo[1].timeslot)[0]]
+    return filtered    
     
 def get_all_course_combos(courses, stud):
     combos = []
@@ -283,10 +285,16 @@ def test_combination_code(courses, students):
     print 'Testing combination code...'
     for stud in students:
         pairs = ''
+        overnights = 'Overnights: '
+        samedays = 'Samedays: '
         for combo in get_all_course_combos(courses, stud):
             pair = list(combo)
             pairs += str((pair[0].crs_id, pair[1].crs_id))
-        print stud.stu_id, pairs
+        for combo in get_all_overnight_course_combos(courses, stud):
+            overnights += str((combo[0].crs_id, combo[1].crs_id))
+        for combo in get_all_sameday_course_combos(courses, stud):
+            samedays += str((combo[0].crs_id, combo[1].crs_id))
+        print stud.stu_id, pairs, overnights, samedays
         
         
 def test_instance(crsfn, stufn):
