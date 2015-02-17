@@ -41,7 +41,10 @@ TIMESLOTS_PER_DAY = 5
 
 CAP_MULTIPLIER = 10
 
-TABU_LIST_LENGTH = 10
+TABU_LIST_SIZE = 10
+BEST_LIST_SIZE = 10
+
+ALLOWABLE_VIOLATIONS = 5
 
 
 class ExamWeek:
@@ -218,11 +221,12 @@ def neighboring_timetables(timetable, exam_week, k=1):
         new_timetable_down[crs] = ensure_valid(new_timetable_down[crs], exam_week)
         neighbors.append(new_timetable_up)
         neighbors.append(new_timetable_down)
+        
     return neighbors
 
-def find_best(timetables, measure, courses, students):
-    """ Returns best timetable in terms of min measure, given courses and students. Returns None if none are better than current score. """
-    best = timetables[0]
+def find_best(timetables, measure, courses, students, p=0):
+    """ Returns best timetable in terms of min measure, given courses and students. Returns random choice with probabiliy p if none are better than current score. """
+    best = None
     lowest_score = measure(courses, students)                       # get current measure
     for table in timetables:
         dummy_courses = list(courses)
@@ -231,7 +235,9 @@ def find_best(timetables, measure, courses, students):
         # print score
         if (score < lowest_score):
             best = table
-            lowest_score = score
+            lowest_score = score                            
+    if best == None or random.random() < p:                           # returns random with probability p
+        best = random.choice(timetables)
     return best
 
 def find_most_feasible(timetables, courses, students, exam_week):
@@ -287,12 +293,10 @@ def student_conflicts(courses, students, exam_week):                 # loop thro
     conflicts = 0
     for stud in students:
         student_courses = [get_course_by_id(course, courses) for course in stud.courses]
-
         timeslots = [course.timeslot for course in student_courses]
         if len(timeslots) != len(set(timeslots)):
             if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable contains STUDENT CONFLICT. \n  Student:', stud.stu_id, '\n  Timeslots:', timeslots, '\n'
             conflicts += 1 
-
     return conflicts
     
 def exceeds_room_cap(courses, exam_week):
@@ -458,11 +462,11 @@ def write_solution_file(filename, sol):
     
 def write_out(courses, students, exam_week, solfn):
     """ Write to stdout and to file. """
-    print exam_week.display(courses)
+    # print exam_week.display(courses)
     sol = print_solution(courses, students)
     print '--- Solution ---'
     print 'Constraint violations: ', constraint_violations(courses, students, exam_week)
-    print sol
+    print sol.split('\n')[0]
     print ''
     write_solution_file(solfn, sol)
 
@@ -481,8 +485,11 @@ def test_combination_code(courses, students):
         for combo in get_all_sameday_course_combos(courses, stud):
             samedays += str((combo[0].crs_id, combo[1].crs_id))
         print stud.stu_id, pairs, overnights, samedays
-        
-        
+
+def trim_list(tabu_list, size):
+    while(len(tabu_list) > size):
+        tabu_list.pop(0)
+
 def test_instance(crsfn, stufn, solfn, obj):
     
     if VERBOSE_TESTING:
@@ -512,48 +519,54 @@ def test_instance(crsfn, stufn, solfn, obj):
     ### PERTURBATION
     # Check constraints and loop until satisfied
     current = list(initial_timetable)
-    tabu_list = [list(current)]
-    best_timetables = [list(current)]
     while True:
         neighbors = neighboring_timetables(current, exam_week)
          
-        # Write to file at regular intervals
+        # Write to file at regular intervals, terminate if over time limit
         t2 = time.time()
+        since_last_write = t2 - t1
         if (t2 - t0 > TIME_LIMIT):
             write_out(courses, students, exam_week, solfn)
-        elif (t2 - t1 > WRITE_EVERY):
+            return
+        elif (since_last_write > WRITE_EVERY):
             write_out(courses, students, exam_week, solfn)
             t1 = time.time()
         
         # always check for constraint violations and get away from them
         if (constraint_violations(courses, students, exam_week) > 0):
             best = find_most_feasible(neighbors, courses, students, exam_week)
-            if best != None and best not in tabu_list:
-                current = best
-                assign_timeslots(courses, current)
-                tabu_list.append(current)
-                if len(tabu_list) > TABU_LIST_LENGTH:
-                    tabu_list.pop(0)
-            else:
-                current = perturb_timetable(current, exam_week, constraint_violations(courses, students, exam_week))
-            continue
-        
-        # begin to optimize when a valid solution has been found
-        if (True):
-            neighbors = only_feasible(neighboring_timetables(current, exam_week), courses, students, exam_week)
-            best = find_best(neighbors, measure, courses, students)
             if best != None:
                 current = best
                 assign_timeslots(courses, current)
             else:
                 current = perturb_timetable(current, exam_week, constraint_violations(courses, students, exam_week))
-
+        
+        # begin to optimize when a valid solution has been found
+        if (constraint_violations(courses, students, exam_week) == 0):
+            last_valid = current
+            neighbors = only_feasible(neighboring_timetables(current, exam_week), courses, students, exam_week)
+            if neighbors == []:
+                # if VERBOSE_TESTING: print 'No feasible neighbors'
+                current = perturb_timetable(current, exam_week)
+            else:
+                best = find_best(neighbors, measure, courses, students)
+            
+            if best != None:
+                current = best
+                assign_timeslots(courses, current)
+            else:
+                # if VERBOSE_TESTING: print 'No best or it is in tabu list'
+                # current = perturb_timetable(current, exam_week)
+                pass
+                
+                
     ### TERMINATE ###
+    print 'Terminating @', time.asctime()
     write_out(courses, students, exam_week, solfn)
 
     print ''
 
-    return
+    return False
 
 if __name__ == "__main__":
 
