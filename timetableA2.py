@@ -19,6 +19,9 @@ ARGS = 5
 MINIMIZE_TIMESLOTS = 0
 MINIMIZE_STUDENTCOST = 1
 
+TIME_LIMIT = 590                # time limit for running
+WRITE_EVERY = 1                 # write best solution every x seconds
+
 VERBOSE_LOADING = False
 VERBOSE_TESTING = True
 VERBOSE_ALERTS = False
@@ -37,6 +40,8 @@ solfile = "instance1.sol"
 TIMESLOTS_PER_DAY = 5
 
 CAP_MULTIPLIER = 10
+
+TABU_LIST_LENGTH = 10
 
 
 class ExamWeek:
@@ -166,20 +171,44 @@ def generate_timetable(courses, exam_week):
     """ Generates initial timetable randomly. """
     maximum = exam_week.timeslots
     return [random.randint(1, maximum) for course in courses]
+
+def generate_sparse_timetable(courses, exam_week):
+    """ Generates initial timetable sequentially stepping through available timeslots. """
+    timetable = []
+    counter = 0
+    maximum = exam_week.timeslots
+    for course in courses:
+        timetable.append((counter % maximum) + 1)
+        counter += 1
+    return timetable
     
-def perturb_timetable(timetable, exam_week):
+def generate_dense_timetable(courses, exam_week):
+    """ Generates initial timetable jamming everything in earliest timeslots. """
+    timetable = []
+    for course in courses:
+        timetable.append(1)
+    return timetable
+    
+def ensure_valid(slot, exam_week):
+    slot = min(exam_week.timeslots, slot)
+    slot = max(1, slot)
+    return slot
+    
+def perturb_timetable(timetable, exam_week, perturbations=1):
     """ Selects random course(crs) from timetable and moves it STEPS timeslots in the timetable. """
     STEPS = 1
     delta = random.choice([-STEPS, STEPS])
-    crs = random.randint(0, len(timetable) - 1)
-    timetable[crs] += delta
-    timetable[crs] = ensure_valid(timetable[crs], exam_week)
+    for x in range(perturbations):
+        crs = random.randint(0, len(timetable) - 1)
+        timetable[crs] += delta
+        timetable[crs] = ensure_valid(timetable[crs], exam_week)
     return timetable
     
-def neighboring_timetables(timetable, exam_week):
-    """ Returns list of all timetables 1 step from given timetable. """
-    neighbors = []
+def neighboring_timetables(timetable, exam_week, k=1):
+    """ Returns list of all timetables 1 step from given timetable (includes given timetable). """
+    neighbors = [timetable]
     delta = 1
+    steps = k
     for crs in range(len(timetable)):
         new_timetable_up = list(timetable)
         new_timetable_down = list(timetable)
@@ -191,43 +220,84 @@ def neighboring_timetables(timetable, exam_week):
         neighbors.append(new_timetable_down)
     return neighbors
 
-def ensure_valid(slot, exam_week):
-    slot = min(exam_week.timeslots, slot)
-    slot = max(1, slot)
-    return slot
+def find_best(timetables, measure, courses, students):
+    """ Returns best timetable in terms of min measure, given courses and students. Returns None if none are better than current score. """
+    best = timetables[0]
+    lowest_score = measure(courses, students)                       # get current measure
+    for table in timetables:
+        dummy_courses = list(courses)
+        assign_timeslots(dummy_courses, table)
+        score = measure(dummy_courses, students)
+        # print score
+        if (score < lowest_score):
+            best = table
+            lowest_score = score
+    return best
+
+def find_most_feasible(timetables, courses, students, exam_week):
+    """ Returns best timetable in terms of feasibility, given courses and students. Returns None if none are better than current score. """
+    best = None
+    lowest_score = constraint_violations(courses, students, exam_week)
+    for table in timetables:
+        dummy_courses = list(courses)
+        assign_timeslots(dummy_courses, table)
+        score = constraint_violations(dummy_courses, students, exam_week)
+        # print score
+        if (score < lowest_score):
+            best = table
+            lowest_score = score
+    return best
+    
+def only_feasible(timetables, courses, students, exam_week):
+    """ Returns only feasible timetables, given courses and students. """
+    feasible = []
+    for table in timetables:
+        dummy_courses = list(courses)
+        assign_timeslots(dummy_courses, table)
+        score = constraint_violations(dummy_courses, students, exam_week)
+        if (score == 0):
+            feasible.append(table)
+    return feasible
 
 ### CONSTRAINTS ###
-def check_constraints(courses, students, exam_week):
-    satisfied = True
-    satisfied = satisfied and not has_exam_gaps(courses)
-    satisfied = satisfied and not has_student_conflict(courses, students, exam_week)
-    satisfied = satisfied and not exceeds_room_cap(courses, exam_week)
-    satisfied = satisfied and not exceeds_available_timeslots(courses, exam_week)
-    return satisfied
+def constraint_violations(courses, students, exam_week):
+    """ Counts number of constraint violations. """
+    violations = 0
+    violations += exam_gaps(courses)
+    violations += student_conflicts(courses, students, exam_week)
+    violations += exceeds_room_cap(courses, exam_week)
+    violations += exceeds_available_timeslots(courses, exam_week)
+    return violations
 
 ### HARD CONSTRAINTS ###    
-def has_exam_gaps(courses):
+def exam_gaps(courses):
+    """ Returns number of exam gaps given list of courses. """
+    gaps = 0
     timeslots = []
     for course in courses:
         timeslots.append(course.timeslot)
     for x in range(1, max(timeslots)):
         if x not in timeslots:
             if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable contains EXAM GAP. Timeslot:', x
-            return True
-    return False
+            gaps += 1
+    return gaps
     
-def has_student_conflict(courses, students, exam_week):                 # loop through students and make sure each students courses have different timeslots
+def student_conflicts(courses, students, exam_week):                 # loop through students and make sure each students courses have different timeslots
+    """ Returns number of student conflicts given exam week info, courses, and students. """
+    conflicts = 0
     for stud in students:
         student_courses = [get_course_by_id(course, courses) for course in stud.courses]
 
         timeslots = [course.timeslot for course in student_courses]
         if len(timeslots) != len(set(timeslots)):
             if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable contains STUDENT CONFLICT. \n  Student:', stud.stu_id, '\n  Timeslots:', timeslots, '\n'
-            return True
+            conflicts += 1 
 
-    return False
+    return conflicts
     
 def exceeds_room_cap(courses, exam_week):
+    """ Checks each timeslot for exceeding room capacity. """
+    violations = 0
     occupancy = {}
     for x in range(1, exam_week.timeslots + 1):
         occupancy[x] = 0
@@ -236,15 +306,17 @@ def exceeds_room_cap(courses, exam_week):
     for x in range(1, exam_week.timeslots + 1):
         if (occupancy[x] > exam_week.room_cap):
             if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable exceeds room capacity. Timeslot:', x 
-            return True
-    return False
+            violations += 1
+    return violations
     
 def exceeds_available_timeslots(courses, exam_week):
+    """ Checks exam week for exceeding available timeslots. """
+    violations = 0
     for course in courses:
         if course.timeslot > exam_week.timeslots:
             if VERBOSE_ALERTS: print 'CONFLICT: Exam timetable exceeds available timeslots.'
-            return True
-    return False
+            violations += 1
+    return violations
     
 ### SOFT CONSTRAINTS ###
 def total_timeslots(courses, students):
@@ -307,7 +379,7 @@ def get_all_course_combos(courses, stud):
                 
     return combos
 
-    
+### FILE IO ###
 def read_crs_file(filename):
     """Read course file and return list of courses, room capacity, and total timeslots."""
     courses = []
@@ -384,6 +456,17 @@ def write_solution_file(filename, sol):
             f.write(line)
     return
     
+def write_out(courses, students, exam_week, solfn):
+    """ Write to stdout and to file. """
+    print exam_week.display(courses)
+    sol = print_solution(courses, students)
+    print '--- Solution ---'
+    print 'Constraint violations: ', constraint_violations(courses, students, exam_week)
+    print sol
+    print ''
+    write_solution_file(solfn, sol)
+
+    
 def test_combination_code(courses, students):
     print 'Testing combination code...'
     for stud in students:
@@ -403,51 +486,70 @@ def test_combination_code(courses, students):
 def test_instance(crsfn, stufn, solfn, obj):
     
     if VERBOSE_TESTING:
-        print 'Testing...', crsfn, 'and', stufn, "@", time.asctime()
+        print 'Timetabling...', crsfn, 'and', stufn, "@", time.asctime()
 
+    t0 = t1 = time.time()
+    
     courses, room_cap, num_exams = read_crs_file(crsfn)
     students = read_stu_file(stufn)
-    
-    #show_items(students)
-    
-    #show_items(courses)
     enroll_students(courses, students)
-    #show_items(courses)
-    
     exam_week = ExamWeek(room_cap, num_exams)
     
     ### SETUP COMPLETE - BEGIN SLS ###
     
-    timetable = generate_timetable(courses, exam_week)
-    assign_timeslots(courses, timetable)
-    
+    ### INITIALIZATION
     if (obj == MINIMIZE_STUDENTCOST):
         measure = total_student_cost
-        goal = 45
+        initial_timetable = generate_sparse_timetable(courses, exam_week)
         print 'SOFT CONSTRAINT: Minimizing student cost.\n'
     else:
         measure = total_timeslots
-        goal = 7
+        initial_timetable = generate_dense_timetable(courses, exam_week)
         print 'SOFT CONSTRAINT: Minimizing timeslots used.\n'
-
-    # Check constraints and loop until satisfied
-    while ((check_constraints(courses, students, exam_week) == False) or (measure(courses, students) > goal)):
-        assign_timeslots(courses, perturb_timetable(timetable, exam_week))
+        
+    assign_timeslots(courses, initial_timetable)
     
+    ### PERTURBATION
+    # Check constraints and loop until satisfied
+    current = list(initial_timetable)
+    tabu_list = [list(current)]
+    best_timetables = [list(current)]
+    while True:
+        neighbors = neighboring_timetables(current, exam_week)
+         
+        # Write to file at regular intervals
+        t2 = time.time()
+        if (t2 - t0 > TIME_LIMIT):
+            write_out(courses, students, exam_week, solfn)
+        elif (t2 - t1 > WRITE_EVERY):
+            write_out(courses, students, exam_week, solfn)
+            t1 = time.time()
+        
+        # always check for constraint violations and get away from them
+        if (constraint_violations(courses, students, exam_week) > 0):
+            best = find_most_feasible(neighbors, courses, students, exam_week)
+            if best != None and best not in tabu_list:
+                current = best
+                assign_timeslots(courses, current)
+                tabu_list.append(current)
+                if len(tabu_list) > TABU_LIST_LENGTH:
+                    tabu_list.pop(0)
+            else:
+                current = perturb_timetable(current, exam_week, constraint_violations(courses, students, exam_week))
+            continue
+        
+        # begin to optimize when a valid solution has been found
+        if (True):
+            neighbors = only_feasible(neighboring_timetables(current, exam_week), courses, students, exam_week)
+            best = find_best(neighbors, measure, courses, students)
+            if best != None:
+                current = best
+                assign_timeslots(courses, current)
+            else:
+                current = perturb_timetable(current, exam_week, constraint_violations(courses, students, exam_week))
 
     ### TERMINATE ###
-    
-    print exam_week.display(courses)
-    sol = print_solution(courses, students)
-    
-    print '--- SOLUTION ---'
-    print sol
-    write_solution_file(solfn, sol)
-    
-    # print '\nNeighbors:', len(neighboring_timetables(timetable, exam_week))
-    
-    # print ''
-    # test_combination_code(courses, students)
+    write_out(courses, students, exam_week, solfn)
 
     print ''
 
